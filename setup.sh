@@ -46,7 +46,7 @@ script_info() {
 }
 
 show_menu() {
-  echo "1) Install and setup Neovim automatically"
+  echo "1) Install and set up Neovim automatically"
   echo "q) Quit"
   echo -n ">: "
 }
@@ -69,7 +69,7 @@ install_nvim() {
   fi
 
   echo -e "${GREEN}>>> Installing Nvim config..."
-  LAZY_PATH = "$HOME/.local/shar/nvim/lazy/lazy.nvim"
+  LAZY_PATH="$HOME/.local/shar/nvim/lazy/lazy.nvim"
   if [ ! -d "$LAZY_PATH" ]; then
     git clone https://github.com/folke/lazy.nvim.git "$LAZY_PATH"
   else
