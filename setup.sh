@@ -5,6 +5,8 @@ REPO_URL="https://github.com/Zship135/Auto-Nvim.git"
 CONFIG_DIR="$HOME/.config/nvim"
 LAZY_PATH="$HOME/.local/share/nvim/lazy/lazy.nvim"
 
+required_nvim_version="0.10.0"
+
 ascii_art() {
 cat << "EOF"
                           ,%@@@@@@@@@@*            .#                           
@@ -57,6 +59,46 @@ show_menu() {
 
 has_command() {
   command -v "$1" >/dev/null 2>&1
+}
+
+ver() { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
+
+install_neovim_appimage() {
+  echo ">>> Installing the latest Neovim AppImage (>= 0.10) ..."
+  if has_command nvim; then
+    sudo rm -f "$(command -v nvim)"
+  fi
+  # Clean up any old local appimage
+  rm -f nvim.appimage
+  curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
+  chmod u+x nvim.appimage
+  sudo mv nvim.appimage /usr/local/bin/nvim
+  # Fix for WSL/AppImage with FUSE2
+  if ! nvim --version &>/dev/null; then
+    echo ">>> AppImage may require libfuse2. Installing..."
+    sudo apt update && sudo apt install -y libfuse2
+  fi
+  echo ">>> Neovim version after AppImage install:"
+  nvim --version | head -n 1
+}
+
+ensure_nvim_version() {
+  if has_command nvim; then
+    local nv_ver
+    nv_ver=$(nvim --version | head -n1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+')
+    if [[ -z "$nv_ver" ]]; then
+      echo ">>> Could not detect Neovim version. Reinstalling..."
+      install_neovim_appimage
+    elif [[ $(ver "$nv_ver") -lt $(ver "$required_nvim_version") ]]; then
+      echo ">>> Neovim version is $nv_ver, but $required_nvim_version or newer is required."
+      install_neovim_appimage
+    else
+      echo ">>> Neovim $nv_ver already installed."
+    fi
+  else
+    echo ">>> Neovim not found. Installing..."
+    install_neovim_appimage
+  fi
 }
 
 install_build_tools() {
@@ -122,20 +164,7 @@ rebuild_fzf_native() {
 install_nvim() {
   echo "Starting Neovim installation and setup..."
 
-  echo ">>> Checking for Neovim..."
-  if ! has_command nvim; then
-    echo ">>> Neovim not found. Attempting to install..."
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-      sudo apt update && sudo apt install -y neovim
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-      brew install neovim
-    else
-      echo ">>> Unsupported OS."
-      exit 1
-    fi
-  else
-    echo ">>> Neovim is already installed. Carrying on..."
-  fi
+  ensure_nvim_version
 
   echo ">>> Installing or updating your custom Neovim config..."
   if [ ! -d "$CONFIG_DIR" ]; then
