@@ -60,7 +60,6 @@ has_command() {
 }
 
 install_build_tools() {
-  # Install system build tools if missing
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     echo ">>> Checking for build-essential (gcc, make)..."
     if ! has_command gcc || ! has_command make; then
@@ -91,6 +90,16 @@ check_c_compiler_and_make() {
   if ! has_command make; then
     echo "ERROR: 'make' not found! Please install make."
     exit 1
+  fi
+}
+
+rebuild_fzf_native() {
+  if [ -d "$HOME/.local/share/nvim/lazy/telescope-fzf-native.nvim" ]; then
+    echo ">>> Attempting to rebuild telescope-fzf-native.nvim..."
+    cd "$HOME/.local/share/nvim/lazy/telescope-fzf-native.nvim"
+    make clean || true
+    make || echo "Manual intervention may be needed for telescope-fzf-native.nvim"
+    cd - >/dev/null
   fi
 }
 
@@ -136,13 +145,14 @@ install_nvim() {
   echo ">>> Running Lazy.nvim plugin sync (if applicable)..."
   nvim --headless "+Lazy sync" +qa || true
 
+  rebuild_fzf_native
+
   echo ""
-  echo ">>> NOTE: MasonInstallAll is not a valid Neovim command."
-  echo ">>> If you want to install language servers or tools, open Neovim and run ':Mason' to select and install them interactively."
+  echo ">>> MasonInstallAll is not a valid Neovim command."
+  echo ">>> To install language servers/tools, open Neovim and run ':Mason' interactively."
   echo ""
   echo ">>> Neovim setup complete! Use 'nvim' to launch."
 } 
-
 
 main_menu() {
   clear
