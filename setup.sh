@@ -69,7 +69,7 @@ install_nvim() {
   fi
 
   echo -e "${GREEN}>>> Installing Nvim config..."
-  LAZY_PATH="$HOME/.local/shar/nvim/lazy/lazy.nvim"
+  LAZY_PATH="$HOME/.local/share/nvim/lazy/lazy.nvim"
   if [ ! -d "$LAZY_PATH" ]; then
     git clone https://github.com/folke/lazy.nvim.git "$LAZY_PATH"
   else
