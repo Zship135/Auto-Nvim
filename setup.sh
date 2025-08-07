@@ -82,6 +82,22 @@ install_build_tools() {
   fi
 }
 
+install_pylint() {
+  echo ">>> Checking for pylint..."
+  if ! has_command pylint; then
+    echo ">>> Installing pylint (requires sudo)..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+      sudo apt update && sudo apt install -y pylint
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+      brew install pylint
+    else
+      echo ">>> Please install pylint manually for your OS."
+    fi
+  else
+    echo ">>> pylint is already installed."
+  fi
+}
+
 check_c_compiler_and_make() {
   if ! has_command gcc && ! has_command cc && ! has_command clang && ! has_command zig; then
     echo "ERROR: No C compiler found! Please install gcc, clang, or zig."
@@ -140,6 +156,7 @@ install_nvim() {
   fi
 
   install_build_tools
+  install_pylint
   check_c_compiler_and_make
 
   echo ">>> Running Lazy.nvim plugin sync (if applicable)..."
