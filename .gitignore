@@ -1,0 +1,10 @@
+# Swap, backup, and undo files
+*.swp
+*.swo
+*.bak
+*.tmp
+*~
+.netrwhist
+session.*
+# macOS
+.DS_Store
