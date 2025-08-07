@@ -77,10 +77,11 @@ install_nvim() {
   fi
 
   echo -e "${GREEN}>>> Syncing plugins..."
-  nvim --headless "+Lazy! sync" +qa
+  nvim --headless "+Lazy sync" +qa
 
   echo -e "${GREEN}>>> Installing mason tools (if needed)..."
   nvim --headless "+MasonInstallAll" +qa || true
+  echo ""
   
   echo -e "${GREEN}>>> Neovim setup complete! Use 'nvim' to launch."
 
