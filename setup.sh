@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
+REPO_URL="https://github.com/Zship135/Auto-Nvim.git"
+CONFIG_DIR="$HOME/.config/nvim"
+LAZY_PATH="$HOME/.local/share/nvim/lazy/lazy.nvim"
+
 ascii_art() {
 cat << "EOF"
                           ,%@@@@@@@@@@*            .#                           
@@ -39,7 +43,7 @@ EOF
 script_info() {
   echo "Auto-Nvim Setup Script"
   echo "Author: Zship135"
-  echo "Repo: https://github.com/Zship135/Auto-Nvim"
+  echo "Repo: $REPO_URL"
   echo ""
   echo "This script will help you install and set up Neovim with your custom configuration."
   echo ""
@@ -53,38 +57,48 @@ show_menu() {
 
 install_nvim() {
   echo "Starting Neovim installation and setup..."
-  echo -e "${GREEN}>>> Checking for Neovim..."
+
+  echo ">>> Checking for Neovim..."
   if ! command -v nvim &>/dev/null; then
-    echo -e "${GREEN}>>> Neovim not found. Attempting to install..."
+    echo ">>> Neovim not found. Attempting to install..."
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       sudo apt update && sudo apt install -y neovim
-    elif [[ "$OSTYPE" == "darwin" ]]; then
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
       brew install neovim
     else
-      echo -e "${RED}>>> Unsupported OS."
+      echo ">>> Unsupported OS."
       exit 1
     fi
   else
-    echo -e "${GREEN}>>> Neovim is already installed. Carrying on..."
+    echo ">>> Neovim is already installed. Carrying on..."
   fi
 
-  echo -e "${GREEN}>>> Installing Nvim config..."
-  LAZY_PATH="$HOME/.local/share/nvim/lazy/lazy.nvim"
-  if [ ! -d "$LAZY_PATH" ]; then
-    git clone https://github.com/folke/lazy.nvim.git "$LAZY_PATH"
+  echo ">>> Installing/updating your custom Neovim config..."
+  if [ ! -d "$CONFIG_DIR" ]; then
+    git clone "$REPO_URL" "$CONFIG_DIR"
   else
-    echo -e "${GREEN}>>>Lazy.nvim already installed. Carrying on..."
+    echo ">>> Config directory already exists. Pulling latest changes..."
+    git -C "$CONFIG_DIR" pull
   fi
 
-  echo -e "${GREEN}>>> Syncing plugins..."
-  nvim --headless "+Lazy sync" +qa
+  # Optional: Ensure lazy.nvim exists if your config expects it in this path.
+  if grep -rq "lazy.nvim" "$CONFIG_DIR"; then
+    echo ">>> Ensuring lazy.nvim is installed..."
+    if [ ! -d "$LAZY_PATH" ]; then
+      git clone https://github.com/folke/lazy.nvim.git "$LAZY_PATH"
+    else
+      echo ">>> lazy.nvim already present."
+    fi
+  fi
 
-  echo -e "${GREEN}>>> Installing mason tools (if needed)..."
+  echo ">>> Running Lazy.nvim plugin sync (if applicable)..."
+  nvim --headless "+Lazy sync" +qa || true
+
+  echo ">>> Installing Mason tools (if applicable)..."
   nvim --headless "+MasonInstallAll" +qa || true
-  echo ""
-  
-  echo -e "${GREEN}>>> Neovim setup complete! Use 'nvim' to launch."
 
+  echo ""
+  echo ">>> Neovim setup complete! Use 'nvim' to launch."
 } 
 
 
