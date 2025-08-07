@@ -1,2 +1,2 @@
-require("zach.core")
-require("zach.lazy")
+require("core")
+require("lazy")
