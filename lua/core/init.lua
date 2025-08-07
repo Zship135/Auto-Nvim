@@ -1,5 +1,5 @@
-require("zach.core.options")
-require("zach.core.keymaps")
+require("core.options")
+require("core.keymaps")
 
 
 
