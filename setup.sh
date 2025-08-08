@@ -416,11 +416,24 @@ install_build_tools() {
     echo "✅ Build tools are available"
 }
 
-install_pylint() {
-    echo "🐍 Checking for pylint..."
+install_python_tools() {
+    echo "🐍 Installing Python development tools..."
+    
+    # Ensure Python and pip are available
+    if ! has_command python3; then
+        echo "📦 Installing Python3..."
+        install_packages python3 python3-pip
+    fi
+    
+    if ! has_command pip3; then
+        echo "📦 Installing pip3..."
+        install_packages python3-pip
+    fi
+    
+    # Install pylint
     if ! has_command pylint; then
-        if has_command python3 && has_command pip3; then
-            echo ">>> Installing pylint via pip3..."
+        echo ">>> Installing pylint..."
+        if has_command pip3; then
             pip3 install --user pylint
         else
             local distro=$(detect_distro)
@@ -432,7 +445,7 @@ install_pylint() {
                     install_packages pylint
                     ;;
                 centos|rhel)
-                    install_packages python3-pylint || echo "WARNING: pylint not available, install manually if needed"
+                    install_packages python3-pylint || true
                     ;;
                 arch|manjaro)
                     install_packages python-pylint
@@ -443,6 +456,22 @@ install_pylint() {
             esac
         fi
     fi
+    
+    # Install pyright language server
+    echo "🔧 Installing language servers..."
+    if ! has_command pyright-langserver && ! has_command pyright; then
+        echo ">>> Installing pyright (Python LSP)..."
+        if has_command npm; then
+            npm install -g pyright
+        elif has_command pip3; then
+            pip3 install --user pyright
+        else
+            echo "⚠️ Cannot install pyright - npm or pip3 required"
+            echo "💡 Install Node.js or ensure pip3 is available"
+        fi
+    fi
+    
+    echo "✅ Python tools installation completed"
 }
 
 check_dependencies() {
@@ -522,8 +551,93 @@ install_nvim() {
         fi
     fi
     
-    # 7. Install additional development tools
-    install_pylint
+install_language_servers() {
+    echo "🌐 Installing common language servers..."
+    
+    # Check if Node.js/npm is available (needed for many LSPs)
+    local need_nodejs=false
+    
+    if ! has_command node || ! has_command npm; then
+        echo "📦 Installing Node.js and npm (required for many language servers)..."
+        local distro=$(detect_distro)
+        case "$distro" in
+            ubuntu|debian)
+                # Install NodeSource repository for latest Node.js
+                curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - || true
+                install_packages nodejs
+                ;;
+            fedora)
+                install_packages nodejs
+                ;;
+            centos|rhel)
+                install_packages nodejs npm
+                ;;
+            arch|manjaro)
+                install_packages nodejs npm
+                ;;
+            *)
+                echo "⚠️ Please install Node.js manually for language server support"
+                ;;
+        esac
+        need_nodejs=true
+    fi
+    
+    # Install common language servers via npm
+    if has_command npm; then
+        echo ">>> Installing language servers via npm..."
+        
+        # Python
+        if ! has_command pyright-langserver && ! has_command pyright; then
+            echo "  • Installing pyright (Python)"
+            npm install -g pyright || echo "  ⚠️ Failed to install pyright"
+        fi
+        
+        # TypeScript/JavaScript
+        if ! has_command typescript-language-server; then
+            echo "  • Installing typescript-language-server"
+            npm install -g typescript-language-server typescript || echo "  ⚠️ Failed to install typescript-language-server"
+        fi
+        
+        # HTML/CSS/JSON
+        if ! has_command vscode-langservers-extracted; then
+            echo "  • Installing vscode language servers (HTML, CSS, JSON)"
+            npm install -g vscode-langservers-extracted || echo "  ⚠️ Failed to install vscode-langservers-extracted"
+        fi
+        
+        # Bash
+        if ! has_command bash-language-server; then
+            echo "  • Installing bash-language-server"
+            npm install -g bash-language-server || echo "  ⚠️ Failed to install bash-language-server"
+        fi
+        
+        # Tailwind CSS (if you use it)
+        if ! has_command tailwindcss-language-server; then
+            echo "  • Installing tailwindcss-language-server"
+            npm install -g @tailwindcss/language-server || echo "  ⚠️ Failed to install tailwindcss-language-server"
+        fi
+    fi
+    
+    # Add npm global bin to PATH
+    if has_command npm; then
+        local npm_bin
+        npm_bin=$(npm bin -g 2>/dev/null || echo "$HOME/.npm-global/bin")
+        if [[ -d "$npm_bin" ]] && [[ ":$PATH:" != *":$npm_bin:"* ]]; then
+            echo "export PATH=\"$npm_bin:\$PATH\"" >> ~/.bashrc
+            echo "export PATH=\"$npm_bin:\$PATH\"" >> ~/.profile
+            if [[ -f ~/.zshrc ]]; then
+                echo "export PATH=\"$npm_bin:\$PATH\"" >> ~/.zshrc
+            fi
+            export PATH="$npm_bin:$PATH"
+            echo "✅ Added npm global bin directory to PATH"
+        fi
+    fi
+    
+    echo "✅ Language server installation completed"
+    
+    if [[ "$need_nodejs" == "true" ]]; then
+        echo "💡 Note: You may need to restart your terminal for Node.js PATH changes to take effect"
+    fi
+}
     
     # 8. Show final Neovim version
     echo ""
