@@ -4,7 +4,6 @@ set -e
 REPO_URL="https://github.com/Zship135/Auto-Nvim.git"
 CONFIG_DIR="$HOME/.config/nvim"
 LAZY_PATH="$HOME/.local/share/nvim/lazy/lazy.nvim"
-
 required_nvim_version="0.10.0"
 
 ascii_art() {
@@ -51,34 +50,25 @@ script_info() {
   echo ""
 }
 
-show_menu() {
-  echo "1) Install and set up Neovim automatically"
-  echo "q) Quit"
-  echo -n ">: "
-}
-
-has_command() {
-  command -v "$1" >/dev/null 2>&1
-}
-
+has_command() { command -v "$1" >/dev/null 2>&1; }
 ver() { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
 
+remove_old_nvim() {
+  echo ">>> Removing old Neovim (apt and legacy binaries)..."
+  sudo apt remove -y neovim || true
+  sudo rm -f /usr/bin/nvim /usr/local/bin/nvim /usr/local/bin/nvim.appimage
+}
+
 install_neovim_appimage() {
-  echo ">>> Installing the latest Neovim AppImage (>= 0.10) ..."
-  if has_command nvim; then
-    sudo rm -f "$(command -v nvim)"
-  fi
-  # Clean up any old local appimage
-  rm -f nvim.appimage
+  echo ">>> Installing Neovim AppImage (>= 0.10.0) ..."
   curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
   chmod u+x nvim.appimage
   sudo mv nvim.appimage /usr/local/bin/nvim
-  # Fix for WSL/AppImage with FUSE2
+  # WSL fix for FUSE2
   if ! nvim --version &>/dev/null; then
     echo ">>> AppImage may require libfuse2. Installing..."
     sudo apt update && sudo apt install -y libfuse2
   fi
-  echo ">>> Neovim version after AppImage install:"
   nvim --version | head -n 1
 }
 
@@ -86,11 +76,9 @@ ensure_nvim_version() {
   if has_command nvim; then
     local nv_ver
     nv_ver=$(nvim --version | head -n1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+')
-    if [[ -z "$nv_ver" ]]; then
-      echo ">>> Could not detect Neovim version. Reinstalling..."
-      install_neovim_appimage
-    elif [[ $(ver "$nv_ver") -lt $(ver "$required_nvim_version") ]]; then
-      echo ">>> Neovim version is $nv_ver, but $required_nvim_version or newer is required."
+    if [[ -z "$nv_ver" ]] || [[ $(ver "$nv_ver") -lt $(ver "$required_nvim_version") ]]; then
+      echo ">>> Neovim version is too old or not found ($nv_ver). Reinstalling..."
+      remove_old_nvim
       install_neovim_appimage
     else
       echo ">>> Neovim $nv_ver already installed."
@@ -99,44 +87,37 @@ ensure_nvim_version() {
     echo ">>> Neovim not found. Installing..."
     install_neovim_appimage
   fi
+  # FINAL CHECK -- halt if still not correct
+  local final_ver
+  final_ver=$(nvim --version | head -n1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+')
+  if [[ -z "$final_ver" ]] || [[ $(ver "$final_ver") -lt $(ver "$required_nvim_version") ]]; then
+    echo "ERROR: Failed to install Neovim >= $required_nvim_version. Please install manually and re-run the script."
+    exit 2
+  fi
+  echo ">>> Using Neovim version: $final_ver"
 }
 
 install_build_tools() {
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     echo ">>> Checking for build-essential (gcc, make)..."
     if ! has_command gcc || ! has_command make; then
-      echo ">>> Installing build-essential (requires sudo)..."
       sudo apt update && sudo apt install -y build-essential
-    else
-      echo ">>> C compiler and make found."
     fi
   elif [[ "$OSTYPE" == "darwin"* ]]; then
-    echo ">>> Checking for Xcode Command Line Tools..."
     if ! has_command gcc || ! has_command make; then
-      echo ">>> Installing Xcode Command Line Tools (may prompt)..."
       xcode-select --install || true
-    else
-      echo ">>> C compiler and make found."
     fi
-  else
-    echo ">>> WARNING: Unable to auto-install build tools for this OS."
-    echo ">>> Please ensure you have a C compiler and make installed."
   fi
 }
 
 install_pylint() {
   echo ">>> Checking for pylint..."
   if ! has_command pylint; then
-    echo ">>> Installing pylint (requires sudo)..."
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       sudo apt update && sudo apt install -y pylint
     elif [[ "$OSTYPE" == "darwin"* ]]; then
       brew install pylint
-    else
-      echo ">>> Please install pylint manually for your OS."
     fi
-  else
-    echo ">>> pylint is already installed."
   fi
 }
 
@@ -153,7 +134,6 @@ check_c_compiler_and_make() {
 
 rebuild_fzf_native() {
   if [ -d "$HOME/.local/share/nvim/lazy/telescope-fzf-native.nvim" ]; then
-    echo ">>> Attempting to rebuild telescope-fzf-native.nvim..."
     cd "$HOME/.local/share/nvim/lazy/telescope-fzf-native.nvim"
     make clean || true
     make || echo "Manual intervention may be needed for telescope-fzf-native.nvim"
@@ -162,41 +142,23 @@ rebuild_fzf_native() {
 }
 
 install_nvim() {
-  echo "Starting Neovim installation and setup..."
-
   ensure_nvim_version
-
-  echo ">>> Installing or updating your custom Neovim config..."
   if [ ! -d "$CONFIG_DIR" ]; then
     git clone "$REPO_URL" "$CONFIG_DIR"
   else
-    echo ">>> Config directory already exists. Pulling latest changes..."
     git -C "$CONFIG_DIR" pull
   fi
-
-  # Optional: Ensure lazy.nvim exists if your config expects it in this path.
   if grep -rq "lazy.nvim" "$CONFIG_DIR"; then
-    echo ">>> Ensuring lazy.nvim is installed..."
     if [ ! -d "$LAZY_PATH" ]; then
       git clone https://github.com/folke/lazy.nvim.git "$LAZY_PATH"
-    else
-      echo ">>> lazy.nvim already present."
     fi
   fi
-
   install_build_tools
   install_pylint
   check_c_compiler_and_make
-
-  echo ">>> Running Lazy.nvim plugin sync (if applicable)..."
+  nvim --version
   nvim --headless "+Lazy sync" +qa || true
-
   rebuild_fzf_native
-
-  echo ""
-  echo ">>> MasonInstallAll is not a valid Neovim command."
-  echo ">>> To install language servers/tools, open Neovim and run ':Mason' interactively."
-  echo ""
   echo ">>> Neovim setup complete! Use 'nvim' to launch."
 } 
 
@@ -204,23 +166,15 @@ main_menu() {
   clear
   ascii_art
   script_info
-
   while true; do
-    show_menu
+    echo "1) Install and set up Neovim automatically"
+    echo "q) Quit"
+    echo -n ">: "
     read -r choice
     case "$choice" in
-      1)
-        install_nvim
-        break
-        ;;
-      q|Q)
-        echo "Goodbye!"
-        clear
-        exit 0
-        ;;
-      *)
-        echo "Invalid choice. Please try again."
-        ;;
+      1) install_nvim; break ;;
+      q|Q) exit 0 ;;
+      *) echo "Invalid choice." ;;
     esac
   done
 }
